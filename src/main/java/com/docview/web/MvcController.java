@@ -37,7 +37,7 @@ public class MvcController {
     }
 	@GetMapping(AUTH_REDIRECT)
 	public void authCallback(@RequestParam String code, HttpServletResponse response) throws IOException {
-		connector.setOAuthCode(code);
+		connector.setOAuthToken(code);
 		response.setStatus(HttpServletResponse.SC_OK);
 		response.setContentType("text/html");
 		PrintWriter doc = response.getWriter();

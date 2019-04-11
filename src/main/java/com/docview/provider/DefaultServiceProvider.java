@@ -7,7 +7,7 @@ import com.docview.ServiceProvider;
 import com.google.api.services.drive.Drive;
 
 @Service
-class DeafultServiceProvider implements ServiceProvider {
+class DefaultServiceProvider implements ServiceProvider {
 	@Autowired
 	GDriveConnect connector;
 	@Override
@@ -16,7 +16,7 @@ class DeafultServiceProvider implements ServiceProvider {
 	}
 
 	@Override
-	public void setOAuthCode(String code) {
+	public void setOAuthToken(String code) {
 		connector.setAuthCode(code);
 	}
 

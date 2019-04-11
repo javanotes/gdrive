@@ -3,7 +3,11 @@ package com.docview;
 import java.io.FileNotFoundException;
 
 import com.docview.dto.FileNode;
-
+/**
+ * Core service facade for document viewer operations
+ * @author Sutanu_Dalui
+ *
+ */
 public interface DocView {
 	/**
 	 * download a file content from drive
