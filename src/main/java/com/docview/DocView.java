@@ -10,6 +10,12 @@ import com.docview.dto.FileNode;
  */
 public interface DocView {
 	/**
+	 * Get a file item by id.
+	 * @param id
+	 * @return
+	 */
+	FileNode getById(String id);
+	/**
 	 * download a file content from drive
 	 * @param path
 	 * @return
@@ -17,13 +23,20 @@ public interface DocView {
 	 */
 	FileNode get(String path) throws FileNotFoundException;
 	/**
-	 * Traverse the directory tree upto one level. If no rootFolder is specified
-	 * this will only show the documents under a given folder.
+	 * List the root directory contents.
 	 * @param rootFolder
 	 * @return
 	 */
-	FileNode list(String rootFolder);
+	FileNode listRoot();
 	/**
+	 * List the content of this dir.
+	 * @param dir
+	 * @return
+	 * @throws FileNotFoundException 
+	 */
+	FileNode list(String dir) throws FileNotFoundException;
+	/**
+	 * @deprecated Not sure if this is correct
 	 * List all files in the drive
 	 * @return
 	 */

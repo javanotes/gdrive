@@ -7,6 +7,7 @@ import java.nio.file.Files;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
@@ -14,6 +15,41 @@ import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
 
 public class FileNode {
+	@Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = 1;
+		result = prime * result + ((id == null) ? 0 : id.hashCode());
+		result = prime * result + ((name == null) ? 0 : name.hashCode());
+		result = prime * result + (int) (size ^ (size >>> 32));
+		result = prime * result + ((type == null) ? 0 : type.hashCode());
+		return result;
+	}
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (obj == null)
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		FileNode other = (FileNode) obj;
+		if (id == null) {
+			if (other.id != null)
+				return false;
+		} else if (!id.equals(other.id))
+			return false;
+		if (name == null) {
+			if (other.name != null)
+				return false;
+		} else if (!name.equals(other.name))
+			return false;
+		if (size != other.size)
+			return false;
+		if (type != other.type)
+			return false;
+		return true;
+	}
 	public FileNode() {
 	}
 	/**
@@ -76,14 +112,21 @@ public class FileNode {
 		}
 		initialize(next, file);
 	}
-	private void initialize(FileNode next, File file) {
+	public boolean hasNonRootChild() {
+		return childFile.isPresent();
+	}
+	public FileNode getLeafChild(){
+		return childFile.get();
+	}
+	private Optional<FileNode> childFile = Optional.empty();;
+	private void initialize(FileNode parent, File file) {
 		if(file != null) {
 			Assert.isTrue(file.exists(), "Does not exist");
 			Assert.isTrue(file.isFile(), "Not a valid file");
 			
-			if(next != null) {
-				next = new FileNode(file.getName(), next, MimePart.ofType(file.toPath()));
-				next.initFile(file);
+			if(parent != null) {
+				childFile = Optional.of( new FileNode(file.getName(), parent, MimePart.ofType(file.toPath())));
+				childFile.get().initFile(file);
 			}
 			else {
 				initFile(file);

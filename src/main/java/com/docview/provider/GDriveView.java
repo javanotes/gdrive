@@ -3,6 +3,7 @@ package com.docview.provider;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.GeneralSecurityException;
@@ -14,6 +15,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.TreeSet;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
@@ -23,6 +25,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.InputStreamResource;
 import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
@@ -63,9 +66,10 @@ class GDriveView implements DocView {
 	private static final String NAME_FILE_QUERY = "name = '" + NAME_PARAM + "'  and "+FILE_QUERY;
 	private static final String CHILD_QUERY = "'"+NAME_PARAM+"' in parents";
 	/**
-	 * &1=dir query, &2=parent id
+	 * &1=dir name, &2=parent id
 	 */
 	private static final String NAME_CHILD_DIR_QUERY = NAME_DIR_QUERY+" and "+CHILD_QUERY; 
+	
 	/**
 	 * &1=file name, &2=parent id
 	 */
@@ -111,9 +115,12 @@ class GDriveView implements DocView {
 				throw new FileIOException("Unable to initialize file listing", e);
 			}
 			try {
-				FileList list = rootBuilder.setPageSize(pageSize)
-						.setQ(query)
-				        .setFields(FIELDS)
+				com.google.api.services.drive.Drive.Files.List queryBld = rootBuilder
+						.setPageSize(pageSize);
+				if(StringUtils.hasText(query)) {
+					queryBld.setQ(query);
+				}
+				FileList list = queryBld.setFields(FIELDS)
 				        .setPageToken(nextPageToken)
 				        .execute();
 				
@@ -151,15 +158,35 @@ class GDriveView implements DocView {
 		}
 		
 	}
+	static class RootElementPredicate implements Predicate<File>{
+
+		protected RootElementPredicate(String id) {
+			super();
+			this.id = id;
+			log.info("Root id : "+id);
+		}
+
+		private String id;
+
+		@Override
+		public boolean test(File t) {
+			return t.getParents() != null && t.getParents().contains(id);
+		}
+		
+	}
+	private final Predicate<File> MatchAll = t -> true;
+	
 	/**
 	 * To get the latest versioned document at a particular level
 	 * @param query
+	 * @param predicate 
 	 * @return
 	 */
-	private List<File> getLatestVersionChilds(String query) {
+	private List<File> getLatestVersion(String query, Predicate<File> predicate) {
 		Map<String, List<File>> filesGrouped = StreamSupport
 				.stream(listGDrive(query).spliterator(), false)
 				.flatMap(List::stream)
+				.filter(predicate)
 				.collect(Collectors.groupingBy(File::getId));
 		
 		
@@ -168,8 +195,13 @@ class GDriveView implements DocView {
 			TreeSet<File> ordered = new TreeSet<>(new FileComparator());
 			ordered.addAll(e.getValue());
 			return ordered.last();
-		}).collect(Collectors.toList());
+		})
+		.collect(Collectors.toList());
 	}
+	private List<File> getLatestVersion(String query) {
+		return getLatestVersion(query, MatchAll);
+	}
+	
 	/**
 	 * Start walking recursively from the given tree
 	 * @param rootDir
@@ -180,15 +212,14 @@ class GDriveView implements DocView {
 		Drive service = provider.getInstance();
 		
 		FileNode root = new FileNode();
-		
-		List<File> files = getLatestVersionChilds(StringUtils.hasText(rootDir) ? NAME_DIR_QUERY.replaceFirst(NAME_PARAM, rootDir) : DIR_QUERY);
+		List<File> files = getLatestVersion(StringUtils.hasText(rootDir) ? NAME_DIR_QUERY.replaceFirst(NAME_PARAM, rootDir) : DIR_QUERY);
 		root.setName(StringUtils.hasText(rootDir) ? rootDir : ROOT);
 		
 		try 
 		{
 			log.info("found files: "+files.size());
 			for(File f : files) {
-				log.debug("found file: "+f.getName() +" "+f.getVersion() + " " + f.getMimeType());
+				log.info("file: "+f.getName() +", "+f.getParents() + ", " + f.getMimeType());
 				FileNode node = associate(root, f);
 				if (node.isDir()) {
 					walkTree(f.getId(), service, node, recursive);
@@ -208,8 +239,8 @@ class GDriveView implements DocView {
 	 * @param f
 	 * @return
 	 */
-	private static FileNode newNode(File f) {
-		FileNode n = new FileNode();
+	private static FileNode newNode(File f, FileNode from) {
+		FileNode n = from == null ? new FileNode() : from;
 		n.setId(f.getId());
 		n.setName(f.getName());
 		n.setType(MimePart.ofType(f.getMimeType()));
@@ -224,6 +255,8 @@ class GDriveView implements DocView {
 			n.setAccessControl(f.getPermissionIds().toString());
 		}
 		n.setDir(n.getType() == MimePart.GDIR);
+		n.setWebLink(f.getWebContentLink());
+		
 		return n;
 	}
 	/**
@@ -233,7 +266,7 @@ class GDriveView implements DocView {
 	 * @return
 	 */
 	private static FileNode associate(FileNode parent, File child) {
-		FileNode node = newNode(child);
+		FileNode node = newNode(child, null);
 		node.setParent(parent);
 		parent.getChilds().add(node);
 		return node;
@@ -247,7 +280,7 @@ class GDriveView implements DocView {
 	 * @throws IOException
 	 */
 	private void walkTree(String rootId, Drive service, FileNode root, boolean recursive) throws IOException {
-		List<File> files = getLatestVersionChilds(CHILD_QUERY.replaceFirst(NAME_PARAM, rootId));
+		List<File> files = getLatestVersion(CHILD_QUERY.replaceFirst(NAME_PARAM, rootId));
         if (files == null || files.isEmpty()) {
             return;
         } 
@@ -267,24 +300,76 @@ class GDriveView implements DocView {
         }
 	}
 	
-	@Override
-	public FileNode list(String rootFolder) {
+	public FileNode listRoot_0() {
 		try {
-			return walk(rootFolder, false);
+			return walk("", false);
 		} catch (IOException e) {
 			if(e.getCause() instanceof NoSuchElementException) {
-				throw new FileIOException("Root folder not found - "+rootFolder, e);
+				throw new FileIOException("Root folder not found", e);
 			}
 			throw new FileIOException("Recursive traversal failure", e);
 		}
 	}
+	
+	@Override
+	public FileNode listRoot() {
+
+		List<File> files = getLatestVersion(CHILD_QUERY.replaceFirst(NAME_PARAM, "root"));
+
+		FileNode root = new FileNode();
+		root.setName(ROOT);
+		try {
+			log.info("found files: " + files.size());
+			for (File f : files) {
+				log.debug("found file: " + f.getName() + " " + f.getParents() + " " + f.getMimeType());
+				FileNode node = associate(root, f);
+				log.info("\tFile -- " + node);
+			}
+
+			return root;
+		} catch (Exception e) {
+			throw new FileIOException(e);
+		}
+
+	}
 	private static final File NOFILE = new File().setName("NOFILE");
 	private static final File NODIR = new File().setName("NODIR");
 	
-	private File getFile(String name) {
-		return StreamSupport
-		.stream(listGDrive(NAME_FILE_QUERY.replaceFirst(NAME_PARAM, name)).spliterator(), false)
-		.flatMap(List::stream).findFirst().orElse(NOFILE);
+	private File getFileByName(String name) throws IOException {
+		Drive drive = provider.getInstance();
+		return drive.files().list()
+		.setQ(NAME_FILE_QUERY.replaceFirst(NAME_PARAM, name))
+		.setPageSize(1)
+        .setFields(FIELDS)
+        .execute().getFiles().stream().findFirst().orElse(NOFILE);
+		
+	}
+	private File getDirByName(String name) throws IOException {
+		Drive drive = provider.getInstance();
+		return drive.files().list()
+		.setQ(NAME_DIR_QUERY.replaceFirst(NAME_PARAM, name))
+		.setPageSize(1)
+        .setFields(FIELDS)
+        .execute().getFiles().stream().findFirst().orElse(NODIR);
+	}
+	
+	private File getFileByQuery(String query) throws IOException {
+		Drive drive = provider.getInstance();
+		return drive.files().list()
+		.setQ(query)
+		.setPageSize(1)
+        .setFields(FIELDS)
+        .execute().getFiles().stream().findFirst().orElse(NOFILE);
+		
+	}
+	private File getDirByQuery(String query) throws IOException {
+		Drive drive = provider.getInstance();
+		return drive.files().list()
+		.setQ(query)
+		.setPageSize(1)
+        .setFields(FIELDS)
+        .execute().getFiles().stream().findFirst().orElse(NODIR);
+		
 	}
 	@SuppressWarnings("unused")
 	private void doMediaDownload(java.io.File outFile, Drive service, String downloadLink) throws IOException, GeneralSecurityException {
@@ -339,9 +424,7 @@ class GDriveView implements DocView {
 		
 		String qry = NAME_CHILD_FILE_QUERY.replaceFirst(NAME_PARAM, fileName).replaceFirst(NAME_PARAM, root.getId());
 				
-		File fileElem = StreamSupport
-		.stream(listGDrive(qry).spliterator(), false)
-		.flatMap(List::stream).findFirst().orElse(NOFILE);
+		File fileElem = getFileByQuery(qry);
 		
 		if(fileElem == NOFILE)
 			throw new NoSuchElementException(fileName);
@@ -353,7 +436,7 @@ class GDriveView implements DocView {
 		return file;
 	}
 	private FileNode getFileNoDir(String path) throws FileNotFoundException, IOException {
-		File found = getFile(path);
+		File found = getFileByName(path);
 		if(found == NOFILE)
 			throw new NoSuchElementException();
 		
@@ -368,14 +451,8 @@ class GDriveView implements DocView {
 		}
 		
 		FileNode file = new FileNode(outFile);
-		file.setLastModifiedAt(found.getModifiedTime().getValue());
-		file.setCreatedAt(found.getCreatedTime().getValue());
-		file.setType(MimePart.ofType(found.getMimeType()));
-		file.setSize(found.getSize());
-		file.setWebLink(found.getWebContentLink());
-		if (found.getPermissionIds() != null) {
-			file.setAccessControl(found.getPermissionIds().toString());
-		}
+		newNode(found, file);
+		
 		return file;
 	}
 	@Override
@@ -394,12 +471,12 @@ class GDriveView implements DocView {
 		}
 	}
 	private String putFile(FileNode path) throws IOException {
-		File found = getFile(path.getName());
+		File found = getFileByName(path.getName());
 		if(found == NOFILE) {
 			return create(path);
 		}
 		else {
-			return update(path, found.getId());
+			return update(path, found);
 		}
 	}
 	private String putFileAndDir(FileNode path) throws IOException {
@@ -429,15 +506,14 @@ class GDriveView implements DocView {
 	 * @param name
 	 * @param parent
 	 * @return
+	 * @throws IOException 
 	 */
-	private File getDirectory(String name, FileNode parent) {
+	private File getDirectory(String name, FileNode parent) throws IOException {
 		String dirQry = parent != null
 				? (NAME_CHILD_DIR_QUERY.replaceFirst(NAME_PARAM, name).replaceFirst(NAME_PARAM, parent.getId()))
 				: (NAME_DIR_QUERY.replaceFirst(NAME_PARAM, name));
 				
-		return StreamSupport
-		.stream(listGDrive(dirQry).spliterator(), false)
-		.flatMap(List::stream).findFirst().orElse(NODIR);
+		return getDirByQuery(dirQry);
 	}
 	
 	private String putDir(String name, FileNode parent) throws IOException {
@@ -451,32 +527,36 @@ class GDriveView implements DocView {
 			}
 
 			Drive drive = provider.getInstance();
-			File file = drive.files().create(fileMetadata).setFields("id").execute();
+			File file = drive.files().create(fileMetadata).setFields("id, parents").execute();
 			return file.getId();
 		}
 		
 		return dir.getId();
 	}
-	private String update(FileNode path, String id) throws IOException {
+	private String update(FileNode path, File found) throws IOException {
+		//Assert.isTrue(path.getParent().getId().equals(found.getParents().get(0)), "update found mismatch in parent id");
 		Drive driveService = provider.getInstance();
 		FileContent mediaContent = new FileContent(path.getType().mimeType(), path.getContent().getFile());
-		return driveService.files().update(id, null, mediaContent).execute().getId();
+		return driveService.files().update(found.getId(), null, mediaContent).execute().getId();
 	}
 	private String create(FileNode path) throws IOException {
 		File fileMetadata = new File();
 		fileMetadata.setName(path.getName());
+		if(path.getParent() != null) {
+			fileMetadata.setParents(Collections.singletonList(path.getId()));
+		}
 		java.io.File filePath = path.getContent().getFile();
 
 		FileContent mediaContent = new FileContent(path.getType().mimeType(), filePath);
 
 		Drive driveService = provider.getInstance();
-		File file = driveService.files().create(fileMetadata, mediaContent).setFields("id").execute();
+		File file = driveService.files().create(fileMetadata, mediaContent).setFields("id, parents").execute();
 		return file.getId();
 	}
 	@Override
 	public FileNode listFiles() {
 		FileNode root = new FileNode();
-		List<File> files = getLatestVersionChilds(FILE_QUERY);
+		List<File> files = getLatestVersion(FILE_QUERY);
 		root.setName(ROOT);
 		try 
 		{
@@ -495,7 +575,12 @@ class GDriveView implements DocView {
 	}
 	@Override
 	public boolean delete(String path) {
-		File found = getFile(path);
+		File found;
+		try {
+			found = getFileByName(path);
+		} catch (IOException e1) {
+			throw new FileIOException("delete execution failed", e1);
+		}
 		if(found == NOFILE)
 			return false;
 		else {
@@ -517,6 +602,42 @@ class GDriveView implements DocView {
 			return path.getId();
 		} catch (IOException e) {
 			throw new FileIOException("directory creation failed", e);
+		}
+	}
+	@Override
+	public FileNode getById(String id) {
+		Drive service = provider.getInstance();
+		File meta;
+		InputStream fileHandle;
+		try {
+			meta = service.files().get(id).execute();
+			fileHandle = service.files().get(id).executeAsInputStream();
+		} catch (IOException e) {
+			throw new FileIOException("Not found - "+id, e);
+		}
+		
+		FileNode file = new FileNode();
+		file.setContent(new InputStreamResource(fileHandle));
+		newNode(meta, file);
+		
+		return file;
+	}
+	@Override
+	public FileNode list(String dirName) throws FileNotFoundException {
+		try {
+			File dir = getDirByName(dirName);
+			if(dir == NODIR)
+				throw new FileNotFoundException(dirName);
+
+			List<File> childs = getLatestVersion(CHILD_QUERY.replaceFirst(NAME_PARAM, dir.getId()));
+			FileNode root = newNode(dir, null);
+			for(File child : childs) {
+				root.getChilds().add(newNode(child, null));
+			}
+			return root;
+			
+		} catch (IOException e) {
+			throw new FileNotFoundException(dirName);
 		}
 	}
 	

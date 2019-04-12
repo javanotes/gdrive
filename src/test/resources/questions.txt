@@ -1,0 +1,85 @@
+==========
+Questions
+==========
+
+1a. Put all 0's on one side of array (count non zero, swap i-th position with count position)
+
+1b. Remove spaces from a given string - Given a string, remove all spaces from the string and return it.
+
+Input:  "g  eeks   for ge  eeks  "
+Output: "geeksforgeeks"
+Expected time complexity is O(n) and only one traversal of string.
+
+2. Find Itinerary from a given list of tickets
+Given a list of tickets, find itinerary in order using the given list. (find root. use reverse map)
+
+Example:
+
+Input:
+"Chennai" -> "Banglore"
+"Bombay" -> "Delhi"
+"Goa"    -> "Chennai"
+"Delhi"  -> "Goa"
+
+Output: 
+Bombay->Delhi, Delhi->Goa, Goa->Chennai, Chennai->Banglore (assume no cycles)
+
+3. Given an array of distinct integers, find if there are two pairs (a, b) and (c, d) such that a+b = c+d, and a, b, c and d are distinct elements. 
+If there are multiple answers, then print any of them. (map sum values as key, to number pairs)
+
+Example:
+
+Input:   {3, 4, 7, 1, 2, 9, 8}
+Output:  (3, 8) and (4, 7)
+Explanation: 3+8 = 4+7
+
+Input:   {3, 4, 7, 1, 12, 9};
+Output:  (4, 12) and (7, 9)
+Explanation: 4+12 = 7+9
+
+Input:  {65, 30, 7, 90, 1, 9, 8};
+Output:  No pairs found 
+
+4. Verifying a 9*9 game of sudoku
+
+5. How to create an N-dimensional array
+class NDimensionalArray {
+  private Object[] array; // internal representation of the N-dimensional array
+  private int[] dimensions; // dimensions of the array
+  private int[] multipliers; // used to calculate the index in the internal array
+
+  NDimensionalArray(int... dimensions) {
+    int arraySize = 1;
+
+    multipliers = new int[dimensions.length];
+    for (int idx = dimensions.length - 1; idx >= 0; idx--) {
+      multipliers[idx] = arraySize;
+      arraySize *= dimensions[idx];
+    }
+    array = new Object[arraySize];
+    this.dimensions = dimensions;
+  }
+  ...
+  public Object get(int... indices) {
+    assert indices.length == dimensions.length;
+    int internalIndex = 0;
+
+    for (int idx = 0; idx < indices.length; idx++) {
+      internalIndex += indices[idx] * multipliers[idx];
+    }
+    return array[internalIndex];
+  }
+  ...
+}
+
+6. Segregate even and odd nodes in a Linked List. (traverse to end, then keep on doing end.next = odd ones)
+
+7. Find the middle of a given linked list . (use 2 pointers, *.next, *.next.next)
+
+8. Remove duplicates from given string (easy. check if using linkedhashmap/set)
+
+9. Minimum operation to make all elements equal in array (easy. basically finding the highest frequency item)
+
+10. Check whether 2 strings are anagram of each other (check length -> if equal, iterate through chars in each and add to set)
+
+11. Minimum characters to be added at front to make string palindrome (delete char from right end and check if the remaining is palindrome)
