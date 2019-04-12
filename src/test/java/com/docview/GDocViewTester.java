@@ -3,6 +3,7 @@ package com.docview;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -28,6 +29,7 @@ import com.google.api.services.drive.Drive;
 // Well, this is an integration test suite really.
 // but could not help since we do not have any 'business service'
 // of sort, to run pure unit tests
+// NOTE: check the console logs to see whether you need to do a Google login
 
 @SpringBootTest
 @RunWith(SpringRunner.class)
@@ -69,6 +71,13 @@ public class GDocViewTester {
 	public void testListAllFilesInGDrive() {
 		log.info("========= testListAllFilesInGDrive ==========");
 		FileNode root = docView.listFiles();
+		assertNotNull(root);
+		log.info(root+"");
+	}
+	@Test
+	public void testCreateDirectoryStructureInGDrive() {
+		log.info("========= testCreateDirectoryStructureInGDrive ==========");
+		String root = docView.mkDirs(new FileNode("/testRoot/testChild1/testChild2", null));
 		assertNotNull(root);
 		log.info(root+"");
 	}
@@ -132,6 +141,42 @@ public class GDocViewTester {
 		}
 	}
 	
+	public void testUploadFileUnderDirectoryGDrive() throws IOException {
+		log.info("========= testUploadFileUnderDirectoryGDrive ==========");
+		try {
+			FileNode file = new FileNode("/results/pdf", ResourceUtils.getFile("classpath:TestUploadFile.pdf"));
+			String id = docView.put(file);
+			assertNotNull(id);
+			file.close();
+			
+		} catch (FileNotFoundException e) {
+			fail("file not found "+e);
+		}
+	}
+	//failing
+	@Test
+	public void testDownloadFileUnderDirectoryGDrive() throws IOException {
+		log.info("========= testDownloadFileUnderDirectoryGDrive ==========");
+		try {
+			testUploadFileUnderDirectoryGDrive();
+			FileNode node = docView.get("/results/pdf/TestUploadFile.pdf");
+			assertNotNull(node);
+			assertNotNull(node.getWebLink());
+			assertNotNull(node.getType());
+			assertNotNull(node.getContent());
+			
+			//assertEquals(file.getSize(), node.getSize());
+			//assertEquals(file.getType(), node.getType());
+			
+			docView.delete(node.getName());
+			
+			node.close();
+			
+		} catch (FileNotFoundException e) {
+			fail("file not found "+e);
+		}
+	}
+	
 	@Test(expected = FileNotFoundException.class)
 	public void testDownloadNonExistingFileGDrive() throws IOException {
 		log.info("========= testDownloadNonExistingFileGDrive ==========");
@@ -143,5 +188,31 @@ public class GDocViewTester {
 		log.info("========= testDeleteNonExistingFileGDrive ==========");
 		boolean deleted = docView.delete("Resume_SutanuDalui_0918_not_present.doc");
 		assertFalse(deleted);
+	}
+	@Test
+	public void testCreateFileNodeWithParentDirs() throws FileNotFoundException {
+		FileNode file = new FileNode("parent1/parent2", ResourceUtils.getFile("classpath:TestUploadFile.pdf"));
+		assertNotNull(file);
+		assertNull(file.getParent());
+		assertTrue(file.isDir());
+		assertEquals("parent1", file.getName());
+		assertEquals(MimePart.GDIR, file.getType());
+		assertTrue(file.hasChildren());
+		
+		file = file.getFirstChild();
+		assertNotNull(file);
+		assertNotNull(file.getParent());
+		assertTrue(file.isDir());
+		assertEquals("parent2", file.getName());
+		assertEquals(MimePart.GDIR, file.getType());
+		assertTrue(file.hasChildren());
+		
+		file = file.getFirstChild();
+		assertNotNull(file);
+		assertNotNull(file.getParent());
+		assertFalse(file.isDir());
+		assertEquals("TestUploadFile.pdf", file.getName());
+		assertEquals(MimePart.PDF, file.getType());
+		assertFalse(file.hasChildren());
 	}
 }

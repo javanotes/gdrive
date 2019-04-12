@@ -4,7 +4,7 @@ import java.io.FileNotFoundException;
 
 import com.docview.dto.FileNode;
 /**
- * Core service facade for document viewer operations
+ * Service facade for document viewer operations
  * @author Sutanu_Dalui
  *
  */
@@ -34,6 +34,12 @@ public interface DocView {
 	 * @return id
 	 */
 	String put(FileNode path);
+	/**
+	 * Create a directory structure, if not present, in drive
+	 * @param path
+	 * @return
+	 */
+	String mkDirs(FileNode path);
 	/**
 	 * Delete a file if exists
 	 * @param path
