@@ -20,7 +20,7 @@ import org.springframework.util.StringUtils;
 
 import com.docview.utils.FileIOException;
 import com.docview.utils.SPIException;
-import com.docview.web.MvcController;
+import com.docview.web.Mvc;
 import com.google.api.client.auth.oauth2.AuthorizationCodeTokenRequest;
 import com.google.api.client.auth.oauth2.BearerToken;
 import com.google.api.client.auth.oauth2.ClientParametersAuthentication;
@@ -126,7 +126,8 @@ class GDriveConnect implements FactoryBean<Drive>{
 		}
     }
     
-    @Deprecated
+    @SuppressWarnings("unused")
+	@Deprecated
 	private Credential getCredentials(String user, String password, boolean refresh) throws IOException, GeneralSecurityException {
 		return refresh ? createCredentialWithRefreshToken(user, password, requestAccessToken(user))
 				: createCredentialWithAccessTokenOnly(requestAccessToken(user));
@@ -225,7 +226,7 @@ class GDriveConnect implements FactoryBean<Drive>{
 		// ideally each user should be passing their google credential to generate oauth2 token
 		try {
 			if(StringUtils.isEmpty(authCode))
-				throw new AuthenticationException("OAuth handshake not done. Open url in browser: "+MvcController.HOST_URL);
+				throw new AuthenticationException("OAuth handshake not done. Open url in browser: "+Mvc.HOST_URL);
 			
 			GoogleCredential credential = 
 			        new GoogleCredential.Builder()

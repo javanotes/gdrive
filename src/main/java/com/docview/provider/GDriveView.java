@@ -1,8 +1,11 @@
 package com.docview.provider;
 
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.GeneralSecurityException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Iterator;
@@ -13,19 +16,24 @@ import java.util.TreeSet;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
+import javax.annotation.PostConstruct;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.core.io.InputStreamResource;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import com.docview.DocView;
 import com.docview.ServiceProvider;
 import com.docview.dto.FileNode;
-import com.docview.dto.Mime;
+import com.docview.dto.MimePart;
 import com.docview.utils.FileIOException;
+import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
+import com.google.api.client.googleapis.media.MediaHttpDownloader;
 import com.google.api.client.http.FileContent;
+import com.google.api.client.http.GenericUrl;
 import com.google.api.services.drive.Drive;
 import com.google.api.services.drive.model.File;
 import com.google.api.services.drive.model.FileList;
@@ -39,13 +47,21 @@ class GDriveView implements DocView {
 	private static final String ROOT = "My Drive";
 	
 	private static final String NAME_PARAM = "@param@";
-	private static final String NAME_DIR_QUERY = "name = '" + NAME_PARAM + "' and mimeType = '"+Mime.GDIR.mimeType()+"'";
-	private static final String DIR_QUERY = "mimeType = '"+Mime.GDIR.mimeType()+"'";
-	private static final String FILE_QUERY = "mimeType != '"+Mime.GDIR.mimeType()+"'";
+	private static final String NAME_DIR_QUERY = "name = '" + NAME_PARAM + "' and mimeType = '"+MimePart.GDIR.mimeType()+"'";
+	private static final String DIR_QUERY = "mimeType = '"+MimePart.GDIR.mimeType()+"'";
+	private static final String FILE_QUERY = "mimeType != '"+MimePart.GDIR.mimeType()+"'";
 	private static final String NAMED_FILE_QUERY = "name = '" + NAME_PARAM + "'  and "+FILE_QUERY;
 	private static final String CHILD_QUERY = "'"+NAME_PARAM+"' in parents";
+	@Value("${file.downloadDir}")
+	private String downloadDir;
 	@Autowired
 	ServiceProvider provider;
+	private Path downloadsPath;
+	@PostConstruct
+	private void init() throws IOException {
+		downloadsPath = Files.createTempDirectory(downloadDir);
+		log.info("Downloads path: "+downloadsPath);
+	}
 	/**
 	 * A resultset type of iterating interface for pulling next available documents on GDrive
 	 * @author Sutanu_Dalui
@@ -176,14 +192,14 @@ class GDriveView implements DocView {
 	private static FileNode newNode(File f) {
 		FileNode n = new FileNode();
 		n.setName(f.getName());
-		n.setType(Mime.valueOfMime(f.getMimeType()));
-		n.getContent().setCreatedAt(f.getCreatedTime().getValue());
-		n.getContent().setLastModifiedAt(f.getModifiedTime().getValue());
-		n.getContent().setSize(f.getSize() == null ? 0 : f.getSize());
+		n.setType(MimePart.ofType(f.getMimeType()));
+		n.setCreatedAt(f.getCreatedTime().getValue());
+		n.setLastModifiedAt(f.getModifiedTime().getValue());
+		n.setSize(f.getSize() == null ? 0 : f.getSize());
 		if (f.getPermissionIds() != null) {
 			n.setAccessControl(f.getPermissionIds().toString());
 		}
-		n.setDir(n.getType() == Mime.GDIR);
+		n.setDir(n.getType() == MimePart.GDIR);
 		return n;
 	}
 	/**
@@ -216,7 +232,7 @@ class GDriveView implements DocView {
         	log.info("Entering directory: "+root.getName());
             for (File file : files) {
             	FileNode child = associate(root, file);
-            	if(recursive && Mime.GDIR.mimeType().equals(file.getMimeType())) {
+            	if(recursive && MimePart.GDIR.mimeType().equals(file.getMimeType())) {
             		walkTree(file.getId(), service, child, recursive);
             	}
             	else {
@@ -249,7 +265,17 @@ class GDriveView implements DocView {
 		.stream(listGDrive(NAMED_FILE_QUERY.replaceFirst(NAME_PARAM, name)).spliterator(), false)
 		.flatMap(List::stream).findFirst().orElse(NOFILE);
 	}
-	
+	@SuppressWarnings("unused")
+	private void doMediaDownload(java.io.File outFile, Drive service, String downloadLink) throws IOException, GeneralSecurityException {
+		FileOutputStream out = new FileOutputStream(outFile, true);
+		MediaHttpDownloader downloader =
+		        new MediaHttpDownloader(GoogleNetHttpTransport.newTrustedTransport(), service.getRequestFactory().getInitializer());
+		downloader.setDirectDownloadEnabled(true);
+		    //downloader.setProgressListener(new FileDownloadProgressListener());
+		downloader.download(new GenericUrl(downloadLink), out);
+		out.flush();
+		out.close();
+	}
 	@Override
 	public FileNode get(String path) throws FileNotFoundException {
 		try {
@@ -257,16 +283,29 @@ class GDriveView implements DocView {
 			if(found == NOFILE)
 				throw new NoSuchElementException();
 			Drive service = provider.getInstance();
-			InputStream in = service.files().get(found.getId()).executeAsInputStream();
-			FileNode file = newNode(found);
-			file.getContent().setContentBytes(new InputStreamResource(in));
+			
+			java.io.File outFile = new java.io.File(downloadsPath.toFile(), found.getName());
+			try(FileOutputStream out = new FileOutputStream(outFile, true)){
+				service.files().get(found.getId()).executeAndDownloadTo(out);
+				out.flush();
+			}
+			
+			FileNode file = new FileNode(outFile);
+			file.setLastModifiedAt(found.getModifiedTime().getValue());
+			file.setCreatedAt(found.getCreatedTime().getValue());
+			file.setType(MimePart.ofType(found.getMimeType()));
+			file.setSize(found.getSize());
 			file.setWebLink(found.getWebContentLink());
+			if (found.getPermissionIds() != null) {
+				file.setAccessControl(found.getPermissionIds().toString());
+			}
 			return file;
 		} 
 		catch (NoSuchElementException e) {
 			throw new FileNotFoundException(path);
 		}
 		catch (Exception e) {
+			e.printStackTrace();
 			FileNotFoundException fne = new FileNotFoundException(path);
 			fne.initCause(e);
 			throw fne;
@@ -293,20 +332,18 @@ class GDriveView implements DocView {
 	}
 	private String update(FileNode path, String id) throws IOException {
 		Drive driveService = provider.getInstance();
-		FileContent mediaContent = new FileContent(path.getType().mimeType(), path.getContent().getContentBytes().getFile());
+		FileContent mediaContent = new FileContent(path.getType().mimeType(), path.getContent().getFile());
 		return driveService.files().update(id, null, mediaContent).execute().getId();
 	}
 	private String create(FileNode path) throws IOException {
 		File fileMetadata = new File();
 		fileMetadata.setName(path.getName());
-		java.io.File filePath = path.getContent().getContentBytes().getFile();
+		java.io.File filePath = path.getContent().getFile();
 
 		FileContent mediaContent = new FileContent(path.getType().mimeType(), filePath);
 
 		Drive driveService = provider.getInstance();
-		File file;
-
-		file = driveService.files().create(fileMetadata, mediaContent).setFields("id").execute();
+		File file = driveService.files().create(fileMetadata, mediaContent).setFields("id").execute();
 		return file.getId();
 	}
 	@Override
@@ -330,12 +367,19 @@ class GDriveView implements DocView {
 		}
 	}
 	@Override
-	public boolean delete(FileNode path) {
-		File found = getFile(path.getName());
+	public boolean delete(String path) {
+		File found = getFile(path);
 		if(found == NOFILE)
 			return false;
 		else {
-			
+			Drive driveService = provider.getInstance();
+			try {
+				driveService.files().delete(found.getId()).execute();
+			} catch (IOException e) {
+				log.warn("Delete failed for: "+path+" => "+e.getMessage());
+				log.debug("", e);
+				return false;
+			}
 		}
 		return true;
 	}

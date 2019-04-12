@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import com.docview.ServiceProvider;
 
 @Controller
-public class MvcController {
+public class Mvc {
 	@Autowired
 	ServiceProvider connector;
 	@Autowired

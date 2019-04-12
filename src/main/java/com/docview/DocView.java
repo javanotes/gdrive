@@ -39,5 +39,5 @@ public interface DocView {
 	 * @param path
 	 * @return
 	 */
-	boolean delete(FileNode path);
+	boolean delete(String path);
 }

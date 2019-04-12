@@ -1,11 +1,13 @@
 package com.docview.dto;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.EnumSet;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-public enum Mime {
+public enum MimePart {
 	PDF("application/pdf"){
 		@Override
 		public String toString() {
@@ -69,15 +71,34 @@ public enum Mime {
 			
 		}
 	};
-	private Mime(String mime) {
+	private MimePart(String mime) {
 		this.mime = mime;
 	}
 	private final String mime;
 	public String mimeType() {
 		return mime;
 	}
-	public static Mime valueOfMime(String mime) {
+	/**
+	 * 
+	 * @param mime
+	 * @return
+	 */
+	public static MimePart ofType(String mime) {
 		return MIMES.get(mime);
 	}
-	private static final Map<String, Mime> MIMES = EnumSet.allOf(Mime.class).stream().collect(Collectors.toMap(Mime::mimeType, Function.identity()));
+	/**
+	 * 
+	 * @param file
+	 * @return
+	 */
+	public static MimePart ofType(Path file) {
+		try {
+			String mime = Files.probeContentType(file);
+			if(MIMES.containsKey(mime))
+				return MIMES.get(mime);
+		} catch (Exception e) {}
+		
+		return UNK;
+	}
+	private static final Map<String, MimePart> MIMES = EnumSet.allOf(MimePart.class).stream().collect(Collectors.toMap(MimePart::mimeType, Function.identity()));
 }
