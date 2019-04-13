@@ -64,6 +64,13 @@ public enum MimePart {
 			
 		}
 	},
+	TXT("text/plain"){
+		@Override
+		public String toString() {
+			return "text";
+			
+		}
+	},
 	UNK("application/octet-stream"){
 		@Override
 		public String toString() {
@@ -84,7 +91,10 @@ public enum MimePart {
 	 * @return
 	 */
 	public static MimePart ofType(String mime) {
-		return MIMES.get(mime);
+		if(mime != null && MIMES.containsKey(mime))
+			return MIMES.get(mime);
+		else
+			return UNK;
 	}
 	/**
 	 * 
@@ -92,13 +102,12 @@ public enum MimePart {
 	 * @return
 	 */
 	public static MimePart ofType(Path file) {
+		String mime = null;
 		try {
-			String mime = Files.probeContentType(file);
-			if(MIMES.containsKey(mime))
-				return MIMES.get(mime);
+			mime = Files.probeContentType(file);
 		} catch (Exception e) {}
 		
-		return UNK;
+		return ofType(mime);
 	}
 	private static final Map<String, MimePart> MIMES = EnumSet.allOf(MimePart.class).stream().collect(Collectors.toMap(MimePart::mimeType, Function.identity()));
 }

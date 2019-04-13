@@ -53,7 +53,8 @@ class GDriveView implements DocView {
 	/**
 	 * The meta fields that we need
 	 */
-	private static final String FIELDS = "nextPageToken, files(id, name, mimeType, size, modifiedTime, createdTime, owners, parents, permissions, version, webContentLink)";
+	private static final String FIELDS = "id, name, mimeType, size, modifiedTime, createdTime, owners, parents, permissions, version, webContentLink";
+	private static final String QRY_FIELDS = "nextPageToken, files("+FIELDS+")";
 	private static final int DEFAULT_PAGES = 10;
 	private static final String ROOT = "My Drive";
 	/*
@@ -120,7 +121,7 @@ class GDriveView implements DocView {
 				if(StringUtils.hasText(query)) {
 					queryBld.setQ(query);
 				}
-				FileList list = queryBld.setFields(FIELDS)
+				FileList list = queryBld.setFields(QRY_FIELDS)
 				        .setPageToken(nextPageToken)
 				        .execute();
 				
@@ -236,26 +237,33 @@ class GDriveView implements DocView {
 	}
 	/**
 	 * Object transformation
-	 * @param f
+	 * @param meta
 	 * @return
 	 */
-	private static FileNode newNode(File f, FileNode from) {
+	private static FileNode newNode(File meta, FileNode from) {
 		FileNode n = from == null ? new FileNode() : from;
-		n.setId(f.getId());
-		n.setName(f.getName());
-		n.setType(MimePart.ofType(f.getMimeType()));
-		if (f.getCreatedTime() != null) {
-			n.setCreatedAt(f.getCreatedTime().getValue());
+		n.setId(meta.getId());
+		n.setName(meta.getName());
+		if(meta.getParents() != null && !meta.getParents().isEmpty()) {
+			String parent = meta.getParents().get(0);
+			FileNode p = new FileNode();
+			p.setId(parent);
+			p.getChilds().add(n);
+			n.setParent(p);
 		}
-		if (f.getModifiedTime() != null) {
-			n.setLastModifiedAt(f.getModifiedTime().getValue());
+		n.setType(MimePart.ofType(meta.getMimeType()));
+		if (meta.getCreatedTime() != null) {
+			n.setCreatedAt(meta.getCreatedTime().getValue());
 		}
-		n.setSize(f.getSize() == null ? 0 : f.getSize());
-		if (f.getPermissionIds() != null) {
-			n.setAccessControl(f.getPermissionIds().toString());
+		if (meta.getModifiedTime() != null) {
+			n.setLastModifiedAt(meta.getModifiedTime().getValue());
+		}
+		n.setSize(meta.getSize() == null ? 0 : meta.getSize());
+		if (meta.getPermissionIds() != null) {
+			n.setAccessControl(meta.getPermissionIds().toString());
 		}
 		n.setDir(n.getType() == MimePart.GDIR);
-		n.setWebLink(f.getWebContentLink());
+		n.setWebLink(meta.getWebContentLink());
 		
 		return n;
 	}
@@ -340,7 +348,7 @@ class GDriveView implements DocView {
 		return drive.files().list()
 		.setQ(NAME_FILE_QUERY.replaceFirst(NAME_PARAM, name))
 		.setPageSize(1)
-        .setFields(FIELDS)
+        .setFields(QRY_FIELDS)
         .execute().getFiles().stream().findFirst().orElse(NOFILE);
 		
 	}
@@ -349,7 +357,7 @@ class GDriveView implements DocView {
 		return drive.files().list()
 		.setQ(NAME_DIR_QUERY.replaceFirst(NAME_PARAM, name))
 		.setPageSize(1)
-        .setFields(FIELDS)
+        .setFields(QRY_FIELDS)
         .execute().getFiles().stream().findFirst().orElse(NODIR);
 	}
 	
@@ -358,7 +366,7 @@ class GDriveView implements DocView {
 		return drive.files().list()
 		.setQ(query)
 		.setPageSize(1)
-        .setFields(FIELDS)
+        .setFields(QRY_FIELDS)
         .execute().getFiles().stream().findFirst().orElse(NOFILE);
 		
 	}
@@ -367,7 +375,7 @@ class GDriveView implements DocView {
 		return drive.files().list()
 		.setQ(query)
 		.setPageSize(1)
-        .setFields(FIELDS)
+        .setFields(QRY_FIELDS)
         .execute().getFiles().stream().findFirst().orElse(NODIR);
 		
 	}
@@ -482,7 +490,8 @@ class GDriveView implements DocView {
 	private String putFileAndDir(FileNode path) throws IOException {
 		FileNode next = putDir(path);
 		if (next != null) {
-			return putFile(next);
+			String fileId = putFile(next);
+			return fileId;
 		}
 		return path.getName();
 	}
@@ -542,15 +551,17 @@ class GDriveView implements DocView {
 	private String create(FileNode path) throws IOException {
 		File fileMetadata = new File();
 		fileMetadata.setName(path.getName());
+		log.info("uploading file '"+path.getName()+"'");
 		if(path.getParent() != null) {
-			fileMetadata.setParents(Collections.singletonList(path.getId()));
+			log.info("creating under parent: "+path.getParent().getName()+"["+path.getParent().getId()+"]");
+			fileMetadata.setParents(Collections.singletonList(path.getParent().getId()));
 		}
 		java.io.File filePath = path.getContent().getFile();
-
 		FileContent mediaContent = new FileContent(path.getType().mimeType(), filePath);
 
 		Drive driveService = provider.getInstance();
-		File file = driveService.files().create(fileMetadata, mediaContent).setFields("id, parents").execute();
+		File file = driveService.files().create(fileMetadata, mediaContent)
+				.setFields("id, parents").execute();
 		return file.getId();
 	}
 	@Override
@@ -610,8 +621,9 @@ class GDriveView implements DocView {
 		File meta;
 		InputStream fileHandle;
 		try {
-			meta = service.files().get(id).execute();
+			meta = service.files().get(id).setFields(FIELDS).execute();
 			fileHandle = service.files().get(id).executeAsInputStream();
+			log.debug("meta found: "+meta);
 		} catch (IOException e) {
 			throw new FileIOException("Not found - "+id, e);
 		}

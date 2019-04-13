@@ -141,7 +141,7 @@ public class GDocViewTester {
 			fail("file not found "+e);
 		}
 	}
-	static String TEST_FILE = "skillset.png";
+	static String TEST_FILE = "questions7.txt";
 	static String TEST_DIR = "/results/ques/";
 	@Test
 	public void testUploadFileUnderDirectoryGDrive() throws IOException {
@@ -151,15 +151,15 @@ public class GDocViewTester {
 			String id = docView.put(file);
 			assertNotNull(id);
 			FileNode node = docView.getById(id);
+			assertNotNull(node.getParent());
+			assertNotNull(node.getParent().getId());
 			assertEquals(id, node.getId());
 			
 		} catch (FileNotFoundException e) {
 			fail("file not found "+e);
 		}
 	}
-	// failing. but we need not use this either
-	// from UI : listRoot() -> list() -> get()
-	//@Test
+	@Test
 	public void testDownloadFileUnderDirectoryGDrive() throws IOException {
 		log.info("========= testDownloadFileUnderDirectoryGDrive ==========");
 		try {
@@ -169,6 +169,7 @@ public class GDocViewTester {
 			assertNotNull(node.getWebLink());
 			assertNotNull(node.getType());
 			assertNotNull(node.getContent());
+			assertNotNull(node.getParent());
 			
 			//assertEquals(file.getSize(), node.getSize());
 			//assertEquals(file.getType(), node.getType());
