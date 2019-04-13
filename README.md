@@ -4,13 +4,13 @@
 A spring boot project to exercise google drive integration using Java client libraries.
 
 Assumptions/Limitations:
-- Only relatively small files (<5mb) can be used for upload/download. As the project uses direct download
+- Only relatively small files (<5mb) have been tested for upload/download. Google format mimes (docx/xlsx etc) have not been tested
 - The service layer junits (basically integration tests) use `installed application` style OAuth2 flow. Thus an auth token will
 be downloaded the first time tests are run. This will require to open a link in browser, as printed in console to authenticate
 google credentials
-- The project does not have a mature UI, or rather any UI worth talking about. The runtime does, however, have a welcome controller to 
-perform OAuth using google credentials
-- No access security has been developed yet. So the navigation flow is strictly defined to make it work as expected
+- The project does not have a mature UI, or rather any UI worth talking about. The runtime does, however, have a welcome controller to perform OAuth using google credentials
+- No access security/session management has been developed. So the navigation flow is strictly defined to make it work as expected
+- To access the api via a client like Postman, the auth token need to be set in the request header (can be found from the console log, post google authentication)
 
 The service layer interface defined is [DocView.java](https://github.com/javanotes/gdrive/blob/master/src/main/java/com/docview/DocView.java). This facade defines the operations that can be done using the google java api.
 
