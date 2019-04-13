@@ -46,4 +46,4 @@ update the the contents of an existing file with the given `id`
 2. Welcome page -> ``GET /api/files`` -- list all files and folder at root level using UI treeview
 3. User clicks a folder -> ``GET /api/files/{id}`` -- list all files and folder under that folder
 4. User clicks a file -> ``GET /api/files/file/{id}`` -- download file
-5. Upload file control -> ``GET api/files/{}`` -- upload file, creating intermediate folders as necessary
+5. Upload file control -> ``POST api/files/{}`` -- upload file, creating intermediate folders as necessary
