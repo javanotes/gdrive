@@ -1,5 +1,5 @@
 # gdrive
-#### *A sample project for Google drive integration*
+#### *A sample project using Google drive integration*
 
 A spring boot project to exercise google drive integration using Java client libraries.
 
@@ -11,3 +11,6 @@ google credentials
 - The project does not have a mature UI, or rather any UI worth talking about. The runtime does, however, have a welcome controller to 
 perform OAuth using google credentials
 - No access security has been developed yet. So the navigation flow is strictly defined to make it work as expected
+
+The service layer interface defined is DocView.
+
