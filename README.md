@@ -1,7 +1,9 @@
 # gdrive
 #### Google Drive Java integration
 
-A spring boot project to exercise google drive integration using Java client libraries. The project has been been registered by the name ``Elementary`` in Google dev console. It requires two OAuth consent from user for managing Drive files.
+A spring boot project to exercise google drive integration using Java client libraries. This is mostly expected to be the backend service for a Drive Manager responsive UI/SPA frontend. The project has been been registered by the name ``Elementary`` in Google dev console. It requires two OAuth consent from user for managing Drive files.
+
+The application will run on a default port of `8088` in a microservice style, using an embedded Jetty server. After start, the OAuth handshake needs to be performed by opening the application root ``http://localhost:8088`` in the browser. The page will redirect to Google secure authentication. and on successful authentication and consent, a `welcome` page will be displayed listing the root files in a json format.
 
 Assumptions/Limitations:
 - Only relatively small files (<5mb) have been tested for upload/download. Does not support Google format mime types (docx/xlsx etc) have not been tested
