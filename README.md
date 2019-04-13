@@ -4,7 +4,7 @@
 A spring boot project to exercise google drive integration using Java client libraries. The project has been been registered by the name ``Elementary`` in Google dev console. It requires two OAuth consent from user for managing Drive files.
 
 Assumptions/Limitations:
-- Only relatively small files (<5mb) have been tested for upload/download. Google format mimes (docx/xlsx etc) have not been tested
+- Only relatively small files (<5mb) have been tested for upload/download. Does not support Google format mime types (docx/xlsx etc) have not been tested
 - The service layer junits (basically integration tests) use `installed application` style OAuth2 flow. Thus an auth token will
 be downloaded the first time tests are run. This will require to open a link in browser, as printed in console to authenticate
 google credentials
