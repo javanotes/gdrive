@@ -27,5 +27,6 @@ public interface ServiceProvider {
 	 * @return
 	 */
 	String getOAuthUrl(String redirectUrl);
+	void setTokenRedirectUri(String string);
 }
 

@@ -1,7 +1,6 @@
 package com.docview.web;
 
 import java.io.IOException;
-import java.io.PrintWriter;
 
 import javax.annotation.PostConstruct;
 import javax.servlet.http.HttpServletResponse;
@@ -26,7 +25,8 @@ public class Mvc {
 	}
 	private static final String AUTH_REDIRECT = "/ocallback";
 	public static final String HOST_URL = "http://localhost:@port@";
-	private static final String AUTH_REDIRECT_URL = HOST_URL+AUTH_REDIRECT;
+	public static final String AUTH_REDIRECT_URL = HOST_URL+AUTH_REDIRECT;
+	public static final String TOKEN_REDIRECT_URL = HOST_URL+"/welcome";
 	
 	public String getHostUrl() {
 		return HOST_URL.replaceFirst("@port@", env.getPort()+"");
@@ -35,18 +35,26 @@ public class Mvc {
     public String redirectToMainPage() {
         return "redirect:" + connector.getOAuthUrl(AUTH_REDIRECT_URL.replaceFirst("@port@", env.getPort()+""));
     }
+	@RequestMapping(value = "/welcome")
+    public String welcome() {
+		return "forward:/api/files";
+    }
 	@GetMapping(AUTH_REDIRECT)
 	public void authCallback(@RequestParam String code, HttpServletResponse response) throws IOException {
 		connector.setOAuthToken(code);
+		connector.setTokenRedirectUri(TOKEN_REDIRECT_URL.replaceFirst("@port@", env.getPort()+""));
 		response.setStatus(HttpServletResponse.SC_OK);
 		response.setContentType("text/html");
-		PrintWriter doc = response.getWriter();
+		/*PrintWriter doc = response.getWriter();
 		doc.println("<html>");
 		doc.println("<head><title>OAuth 2.0 Authentication Token Received</title></head>");
 		doc.println("<body>");
 		doc.println("Received verification code. Now you may continue ..");
 		doc.println("</body>");
 		doc.println("</html>");
-		doc.flush();
+		doc.flush();*/
+		response.sendRedirect("/welcome");
+		
+		//return "forward:/api/files";
 	}
 }

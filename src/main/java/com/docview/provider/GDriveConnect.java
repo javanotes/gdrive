@@ -86,6 +86,7 @@ class GDriveConnect implements FactoryBean<Drive>{
         // keeping a dynamic port so that it does not collide with the Spring embedded server
         receiver = new SpringJettyLocalServerReceiver.Builder()/*.setPort(8888)*/.build();
     }
+    private String redirect_url;
     /**
      * The Google OAuth authentication url. Requires a redirect url for handshake.
      * If not provided, will use the default redirect handler that will start an embedded Jetty server
@@ -110,6 +111,7 @@ class GDriveConnect implements FactoryBean<Drive>{
 				throw new UncheckedIOException(e);
 			} 
 		}
+		redirect_url = redirectUri;
 		return flow.newAuthorizationUrl().setRedirectUri(redirectUri).build();
     }
     private GoogleAuthorizationCodeFlow flow;
@@ -129,8 +131,8 @@ class GDriveConnect implements FactoryBean<Drive>{
     @SuppressWarnings("unused")
 	@Deprecated
 	private Credential getCredentials(String user, String password, boolean refresh) throws IOException, GeneralSecurityException {
-		return refresh ? createCredentialWithRefreshToken(user, password, requestAccessToken(user))
-				: createCredentialWithAccessTokenOnly(requestAccessToken(user));
+		return refresh ? createCredentialWithRefreshToken(user, password, token)
+				: createCredentialWithAccessTokenOnly(token);
 	}
 
 	private Credential createCredentialWithAccessTokenOnly(TokenResponse tokenResponse) {
@@ -144,6 +146,7 @@ class GDriveConnect implements FactoryBean<Drive>{
 				.setFromTokenResponse(tokenResponse);
 	}
 	
+	private volatile TokenResponse token = null;
 	/**
 	 * 
 	 * @param authCode
@@ -151,15 +154,17 @@ class GDriveConnect implements FactoryBean<Drive>{
 	 * @throws IOException
 	 * @throws GeneralSecurityException
 	 */
-	private TokenResponse requestAccessToken(String authCode) throws IOException, GeneralSecurityException {
+	private synchronized void requestAccessToken(String authCode) throws IOException, GeneralSecurityException {
+		if(token != null)
+			return;
 		try {
 			TokenResponse response = new AuthorizationCodeTokenRequest(GoogleNetHttpTransport.newTrustedTransport(), JSON_FACTORY,
 					new GenericUrl(clientSecrets.getDetails().getTokenUri()), authCode)
-							//.setRedirectUri("https://client.example.com/rd")
+							.setRedirectUri(redirect_url)
 							.setClientAuthentication(new ClientParametersAuthentication(clientSecrets.getDetails().getClientId(), clientSecrets.getDetails().getClientSecret()))
 							.execute();
 			System.out.println("Access token: " + response.getAccessToken());
-			return response;
+			token = response;
 		} catch (TokenResponseException e) {
 			if (e.getDetails() != null) {
 				System.err.println("Error: " + e.getDetails().getError());
@@ -228,6 +233,7 @@ class GDriveConnect implements FactoryBean<Drive>{
 			if(StringUtils.isEmpty(authCode))
 				throw new AuthenticationException("OAuth handshake not done. Open url in browser: "+Mvc.HOST_URL);
 			
+			requestAccessToken(authCode);
 			GoogleCredential credential = 
 			        new GoogleCredential.Builder()
 			            .setTransport(GoogleNetHttpTransport.newTrustedTransport())
@@ -235,12 +241,14 @@ class GDriveConnect implements FactoryBean<Drive>{
 			            .setClientSecrets(clientSecrets.getDetails().getClientId(), clientSecrets.getDetails().getClientSecret())
 			            .build();
 			credential.createScoped(SCOPES)
-			.setFromTokenResponse(requestAccessToken(authCode));
+			.setFromTokenResponse(token);
 			
 			return new Drive.Builder(GoogleNetHttpTransport.newTrustedTransport(), JSON_FACTORY, credential)
 			            .setApplicationName(APPLICATION_NAME)
 			            .build();
+			
 		} catch (AuthenticationException | GeneralSecurityException | IOException e) {
+			e.printStackTrace();
 			throw new SPIException(e.getMessage(), e);
 		}
 	}
@@ -252,5 +260,10 @@ class GDriveConnect implements FactoryBean<Drive>{
 
 	public boolean isSingleton() {
 		return false;
+	}
+	@SuppressWarnings("unused")
+	private String tokenRedirectUri;
+	public void setTokenRedirectUri(String string) {
+		tokenRedirectUri = string;
 	}
 }

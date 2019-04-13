@@ -9,6 +9,7 @@ import com.docview.dto.FileNode;
  *
  */
 public interface DocView {
+	public static final String GROOT = "My Drive";
 	/**
 	 * Get a file item by id.
 	 * @param id
