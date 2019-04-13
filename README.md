@@ -1,5 +1,5 @@
 # gdrive
-#### *A sample project using Google drive integration*
+#### Google Drive Java integration
 
 A spring boot project to exercise google drive integration using Java client libraries.
 
@@ -40,3 +40,10 @@ upload the multipart `file` to root (if no `path` specified), or to a directory 
 - > PATCH /api/files/file/{id} multipart(file)
 
 update the the contents of an existing file with the given `id`
+
+#### Proposed UI flow
+1. User login -> Google OAuth handshake -> save auth token
+2. Welcome page -> ``GET /api/files`` -- list all files and folder at root level using UI treeview
+3. User clicks a folder -> ``GET /api/files/{id}`` -- list all files and folder under that folder
+4. User clicks a file -> ``GET /api/files/file/{id}`` -- download file
+5. Upload file control -> ``GET api/files/{}`` -- upload file, creating intermediate folders as necessary
