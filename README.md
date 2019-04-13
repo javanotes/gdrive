@@ -12,5 +12,31 @@ google credentials
 perform OAuth using google credentials
 - No access security has been developed yet. So the navigation flow is strictly defined to make it work as expected
 
-The service layer interface defined is DocView.
+The service layer interface defined is [DocView.java](https://github.com/javanotes/gdrive/blob/master/src/main/java/com/docview/DocView.java). This facade defines the operations that can be done using the google java api.
 
+#### End point REST api:
+
+- > GET /api/files
+
+return a collection of files and folders available (one level) in the root directory (My Drive). The items will have a `name` and
+`id` property
+
+- > GET /api/files/{id}
+
+return a collection of files and folders available (one level) in the non-root directory specified by its `id`
+
+- > GET /api/files/file/{id}
+
+download a file (if exists) specified by its `id`
+
+- > GET /api/files/file/search/{name}
+
+download a file (if exists) specified by its `name`. For multiple matching results, the tie breaker is undefined. The file will be searched recursively in the complete drive tree (under construction)
+
+- > POST /api/files/{path} multipart(file)
+
+upload the multipart `file` to root (if no `path` specified), or to a directory `path`. Missing directories will be created automatically
+
+- > PATCH /api/files/file/{id} multipart(file)
+
+update the the contents of an existing file with the given `id`
