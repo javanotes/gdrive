@@ -7,6 +7,7 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.web.ServerProperties;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -44,7 +45,7 @@ public class Mvc {
 		connector.setOAuthToken(code);
 		connector.setTokenRedirectUri(TOKEN_REDIRECT_URL.replaceFirst("@port@", env.getPort()+""));
 		response.setStatus(HttpServletResponse.SC_OK);
-		response.setContentType("text/html");
+		response.setContentType(MediaType.APPLICATION_JSON_UTF8_VALUE);
 		/*PrintWriter doc = response.getWriter();
 		doc.println("<html>");
 		doc.println("<head><title>OAuth 2.0 Authentication Token Received</title></head>");

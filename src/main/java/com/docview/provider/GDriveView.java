@@ -3,20 +3,19 @@ package com.docview.provider;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.GeneralSecurityException;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.TreeSet;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
-import java.util.stream.StreamSupport;
 
 import javax.annotation.PostConstruct;
 
@@ -47,7 +46,7 @@ import com.google.api.services.drive.model.FileList;
  *
  */
 @Service
-class GDriveView implements DocView {
+public class GDriveView implements DocView {
 	private static Logger log = LoggerFactory.getLogger(GDriveView.class.getSimpleName());
 	/**
 	 * The meta fields that we need
@@ -60,10 +59,11 @@ class GDriveView implements DocView {
 	 * Various search queries
 	 */
 	private static final String NAME_PARAM = "@param@";
+	//private static final String ID_QUERY = "id = '"+ NAME_PARAM + "'";
 	private static final String NAME_DIR_QUERY = "name = '" + NAME_PARAM + "' and mimeType = '"+MimePart.GDIR.mimeType()+"'";
 	private static final String DIR_QUERY = "mimeType = '"+MimePart.GDIR.mimeType()+"'";
 	private static final String FILE_QUERY = "mimeType != '"+MimePart.GDIR.mimeType()+"'";
-	private static final String NAME_FILE_QUERY = "name = '" + NAME_PARAM + "'  and "+FILE_QUERY;
+	private static final String NAME_FILE_QUERY = "name = '" + NAME_PARAM + "' and "+FILE_QUERY;
 	private static final String CHILD_QUERY = "'"+NAME_PARAM+"' in parents";
 	/**
 	 * &1=dir name, &2=parent id
@@ -86,63 +86,38 @@ class GDriveView implements DocView {
 		downloadsPath.toFile().deleteOnExit();
 		log.info("Downloads path: "+downloadsPath);
 	}
-	/**
-	 * A resultset type of iterating interface for pulling next available documents on GDrive
-	 * @author Sutanu_Dalui
-	 *
-	 */
-	private class GDriveIterator implements Iterator<List<File>>{
-		protected GDriveIterator(String query) {
-			super();
-			this.query = query;
-		}
-		
-		private int pageSize = DEFAULT_PAGES;
-		private final String query;
-		private com.google.api.services.drive.Drive.Files.List rootBuilder;
-		private String nextPageToken = null;
-		private final List<File> currentPage = new ArrayList<>();
-		
-		private Drive service = provider.getInstance();
-		private boolean hasMore = true;
-		@Override
-		public boolean hasNext() {
-			if(!hasMore)
-				return false;
-			currentPage.clear();
-			try {
-				rootBuilder = service.files().list();
-			} catch (IOException e) {
-				throw new FileIOException("Unable to initialize file listing", e);
-			}
-			try {
-				com.google.api.services.drive.Drive.Files.List queryBld = rootBuilder
-						.setPageSize(pageSize);
-				if(StringUtils.hasText(query)) {
-					queryBld.setQ(query);
-				}
-				FileList list = queryBld.setFields(QRY_FIELDS)
-				        .setPageToken(nextPageToken)
-				        .execute();
-				
-				nextPageToken = list.getNextPageToken();
-				currentPage.addAll(list.getFiles());
-				hasMore = nextPageToken != null;
-				
-			} catch (IOException e) {
-				throw new FileIOException("Unable to iterate pageset", e);
-			}
-			return !currentPage.isEmpty();
+	
+	private List<File> iterateQueryResult(String query) throws IOException {
+		String _q = query;
+		if (_q != null) {
+			_q = StringUtils.trimLeadingWhitespace(_q);
+			_q = StringUtils.trimTrailingWhitespace(_q);
 		}
 
-		@Override
-		public List<File> next() {
-			return new ArrayList<>(currentPage);
-		}
-		
+		log.info("query: '" + _q + "'");
+
+		String pageToken = null;
+		List<File> resultSet = new LinkedList<>();
+		Drive drive = provider.getInstance();
+		do {
+			FileList result = drive.files().list()
+					.setQ(_q)
+					.setPageSize(DEFAULT_PAGES)
+					.setSpaces("drive")
+					.setFields(QRY_FIELDS)
+					.setPageToken(pageToken)
+					.execute();
+			
+			for (File file : result.getFiles()) {
+				resultSet.add(file);
+			}
+			pageToken = result.getNextPageToken();
+		} while (pageToken != null);
+
+		return resultSet;
 	}
 	
-	private Iterable<List<File>> listGDrive(String query){
+	/*private Iterable<List<File>> listGDrive(String query){
 		
 		return new Iterable<List<File>>() {
 			@Override
@@ -150,7 +125,7 @@ class GDriveView implements DocView {
 				return new GDriveIterator(query);
 			}
 		};
-	}
+	}*/
 	private static class FileComparator implements Comparator<File>{
 
 		@Override
@@ -182,11 +157,11 @@ class GDriveView implements DocView {
 	 * @param query
 	 * @param predicate 
 	 * @return
+	 * @throws IOException 
 	 */
-	private List<File> getLatestVersion(String query, Predicate<File> predicate) {
-		Map<String, List<File>> filesGrouped = StreamSupport
-				.stream(listGDrive(query).spliterator(), false)
-				.flatMap(List::stream)
+	private List<File> getLatestVersion(String query, Predicate<File> predicate) throws IOException {
+		Map<String, List<File>> filesGrouped = iterateQueryResult(query).stream()
+				//.flatMap(List::stream)
 				.filter(predicate)
 				.collect(Collectors.groupingBy(File::getId));
 		
@@ -200,7 +175,11 @@ class GDriveView implements DocView {
 		.collect(Collectors.toList());
 	}
 	private List<File> getLatestVersion(String query) {
-		return getLatestVersion(query, MatchAll);
+		try {
+			return getLatestVersion(query, MatchAll);
+		} catch (IOException e) {
+			throw new FileIOException("while iterating query result", e);
+		}
 	}
 	
 	/**
@@ -230,6 +209,34 @@ class GDriveView implements DocView {
 			}
 			
 			return root;
+		} 
+		catch (NoSuchElementException e) {
+			throw new IOException(e);
+		}
+	}
+	/**
+	 * Walk by root name
+	 * @param dir
+	 * @return
+	 * @throws IOException
+	 */
+	private FileNode walkDir(File dir) throws IOException {
+		Drive service = provider.getInstance();
+		try 
+		{
+			File f = getLatestVersion(NAME_DIR_QUERY.replaceFirst(NAME_PARAM, dir.getName())).stream().findFirst().orElse(NODIR);
+			if(f == NODIR)
+				throw new NoSuchElementException(dir.getName());
+			
+			log.debug("Dir: "+f.getName() +", "+f.getParents() + ", " + f.getMimeType());
+			FileNode node = newNode(f, null);
+			
+			if (node.isDir()) {
+				walkTree(f.getId(), service, node, false);
+			} else {
+				throw new IOException("'" + dir + "' is not a directory");
+			}
+			return node;
 		} 
 		catch (NoSuchElementException e) {
 			throw new IOException(e);
@@ -294,23 +301,23 @@ class GDriveView implements DocView {
         } 
         else 
         {
-        	log.info("Entering directory: "+root.getName());
+        	log.debug("Entering directory: "+root.getName());
             for (File file : files) {
             	FileNode child = associate(root, file);
             	if(recursive && MimePart.GDIR.mimeType().equals(file.getMimeType())) {
             		walkTree(file.getId(), service, child, recursive);
             	}
             	else {
-            		log.info("\tFile -- "+child);
+            		log.debug("\tFile -- "+child);
             	}
                 
             }
         }
 	}
 	
-	public FileNode listRoot_0() {
+	public FileNode listRoot_0(String root) {
 		try {
-			return walk("", false);
+			return walk(root, false);
 		} catch (IOException e) {
 			if(e.getCause() instanceof NoSuchElementException) {
 				throw new FileIOException("Root folder not found", e);
@@ -351,6 +358,10 @@ class GDriveView implements DocView {
         .setFields(QRY_FIELDS)
         .execute().getFiles().stream().findFirst().orElse(NOFILE);
 		
+	}
+	private File getFileById(String id) throws IOException {
+		Drive drive = provider.getInstance();
+		return drive.files().get(id).setFields(FIELDS).execute();
 	}
 	private File getDirByName(String name) throws IOException {
 		Drive drive = provider.getInstance();
@@ -460,8 +471,19 @@ class GDriveView implements DocView {
 				request.getMediaHttpDownloader().setDirectDownloadEnabled(true);
 				request.executeMediaAndDownloadTo(out);
 			}
+			// google docs not handled
 			else {
-				request.executeAndDownloadTo(out);
+				int block = 4096;
+				byte [] b = new byte[block];
+				int read = 0;
+				try(InputStream stream = request.executeMedia().getContent()){
+					read = stream.read(b);
+					while(read != -1) {
+						out.write(b, 0, read);
+						read = stream.read(b);
+					}
+				}
+				
 			}
 			out.flush();
 		}
@@ -492,7 +514,13 @@ class GDriveView implements DocView {
 		}
 	}
 	private String putFile(FileNode path) throws IOException {
-		File found = getFileByName(path.getName());
+		File found;
+		if(StringUtils.hasText(path.getId())) {
+			found = getFileById(path.getId());
+		}
+		else
+			found = getFileByName(path.getName());
+		
 		if(found == NOFILE) {
 			return create(path);
 		}
@@ -633,12 +661,11 @@ class GDriveView implements DocView {
 	}
 	@Override
 	public FileNode getById(String id) {
-		Drive service = provider.getInstance();
 		File meta;
 		try {
-			meta = service.files().get(id).setFields(FIELDS).execute();
+			meta = getFileById(id);
 			log.debug("meta found: "+meta);
-			if(MimePart.GDOC.mimeType().equals(meta.getMimeType())) {
+			if(MimePart.GDIR.mimeType().equals(meta.getMimeType())) {
 				return list(meta);
 			}
 			
@@ -649,13 +676,15 @@ class GDriveView implements DocView {
 		}
 		
 	}
-	private FileNode list(File dir) {
-		List<File> childs = getLatestVersion(CHILD_QUERY.replaceFirst(NAME_PARAM, dir.getId()));
+	private FileNode list(File dir) throws IOException {
+		/*List<File> childs = getLatestVersion(CHILD_QUERY.replaceFirst(NAME_PARAM, dir.getId()));
 		FileNode root = newNode(dir, null);
 		for(File child : childs) {
 			root.getChilds().add(newNode(child, null));
 		}
-		return root;
+		return root;*/
+		
+		return walkDir(dir);
 	}
 	@Override
 	public FileNode list(String dirName) throws FileNotFoundException {

@@ -20,6 +20,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -154,5 +155,12 @@ public class Rest {
 		log.info("File uploaded: "+id);
 	}
 	
+	@PatchMapping("/files/file/{id}")
+	public void updateFile(@PathVariable(name = "id", required = true) String id, @RequestParam("file") MultipartFile file) {
+		FileNode node = new FileNode(resolve(file));
+		node.setId(id);
+		docView.put(node);
+		log.info("File updated: "+id);
+	}
 	
 }

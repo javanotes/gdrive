@@ -24,6 +24,7 @@ import org.springframework.util.ResourceUtils;
 
 import com.docview.dto.FileNode;
 import com.docview.dto.MimePart;
+import com.docview.provider.GDriveView;
 import com.google.api.services.drive.Drive;
 
 // Well, this is an integration test suite really.
@@ -56,16 +57,22 @@ public class GDocViewTester {
 	@Test
 	public void testRootRecursiveTraversalGDrive() {
 		log.info("========= testRootRecursiveTraversalGDrive ==========");
-		FileNode root = docView.listRoot();
+		FileNode root = ((GDriveView) docView).listRoot_0("Resume");
+		//FileNode root = docView.listRoot();
 		assertNotNull(root);
 		log.info(root+"");
 	}
+	
 	@Test
 	public void testSelectedFolderTraversalGDrive() throws FileNotFoundException {
 		log.info("========= testSelectedFolderTraversalGDrive ==========");
-		FileNode root = docView.list("results");
+		FileNode root = docView.list("Resume");
 		assertNotNull(root);
-		log.info(root+"\n\t"+root.getChilds());
+		log.info(root.getChilds().size()+"\n\t"+root.getChilds());
+		
+		root = docView.getById(root.getId());
+		assertNotNull(root);
+		log.info(root.getChilds().size()+"\n\t"+root.getChilds());
 	}
 	@Deprecated
 	@Test
