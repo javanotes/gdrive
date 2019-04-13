@@ -1,7 +1,7 @@
 # gdrive
 #### Google Drive Java integration
 
-A spring boot project to exercise google drive integration using Java client libraries.
+A spring boot project to exercise google drive integration using Java client libraries. The project has been been registered by the name ``Elementary`` in Google dev console. It requires two OAuth consent from user for managing Drive files.
 
 Assumptions/Limitations:
 - Only relatively small files (<5mb) have been tested for upload/download. Google format mimes (docx/xlsx etc) have not been tested
