@@ -5,14 +5,14 @@ A spring boot project to exercise google drive integration using Java client lib
 
 The application will run on a default port of `8088` in a microservice style, using an embedded Jetty server. After start, the OAuth handshake needs to be performed by opening the application root ``http://localhost:8088`` in the browser. The page will redirect to Google secure authentication. and on successful authentication and consent, a `welcome` page will be displayed listing the root files in a json format.
 
-Assumptions/Limitations:
+Scope:
 - Only relatively small files (<5mb) have been tested for upload/download. Does not support Google format mime types (docx/xlsx etc) have not been tested
 - The service layer junits (basically integration tests) use `installed application` style OAuth2 flow. Thus an auth token will
 be downloaded the first time tests are run. This will require to open a link in browser, as printed in console to authenticate
 google credentials
 - The project does not have a mature UI, or rather any UI worth talking about. The runtime does, however, have a welcome controller to perform OAuth using google credentials
-- No access security/session management has been developed. So the navigation flow is strictly defined to make it work as expected
-- To access the api via a client like Postman, bearer token validation is not implemented. However, will need to do a OAuth first before sending requests
+- No comprehensive web security/session management has been developed. So the navigation flow is strictly defined to make it work as expected
+- To access the REST api via a client like Postman, however, a `Bearer` token validation is required. The OAuth token will be printed in console and need to be provided as an `Authorization` header in the request.
 
 The service layer interface defined is [DocView.java](https://github.com/javanotes/gdrive/blob/master/src/main/java/com/docview/DocView.java). This facade defines the operations that can be done using the google java api.
 
@@ -43,6 +43,20 @@ upload the multipart `file` to root (if no `path` specified), or to a directory 
 
 update the the contents of an existing file with the given `id`
 
+The general response JSON structure is
+```
+{
+    "name": "Knowledge",
+    "id": "1xYpQZhC4GLELNH9G37CvQUkLvP98-uLw",
+    "dirs": [],
+    "files": [
+        {
+            "name": "Learning-Spark-Lightning-Fast-Data-Analysis.pdf",
+            "id": "11Ii76RPXau1qUVwlJKfqvxAPt8dJjkEA"
+        }
+    ]
+}
+```
 #### Proposed UI flow
 1. User login -> Google OAuth handshake -> save auth token
 2. Welcome page -> ``GET /api/files`` -- list all files and folder at root level using UI treeview
