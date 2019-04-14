@@ -12,7 +12,7 @@ be downloaded the first time tests are run. This will require to open a link in 
 google credentials
 - The project does not have a mature UI, or rather any UI worth talking about. The runtime does, however, have a welcome controller to perform OAuth using google credentials
 - No access security/session management has been developed. So the navigation flow is strictly defined to make it work as expected
-- To access the api via a client like Postman, the auth token need to be set in the request header (can be found from the console log, post google authentication)
+- To access the api via a client like Postman, bearer token validation is not implemented. However, will need to do a OAuth first before sending requests
 
 The service layer interface defined is [DocView.java](https://github.com/javanotes/gdrive/blob/master/src/main/java/com/docview/DocView.java). This facade defines the operations that can be done using the google java api.
 
@@ -35,7 +35,7 @@ download a file (if exists) specified by its `id`
 
 download a file (if exists) specified by its `name`. For multiple matching results, the tie breaker is undefined. The file will be searched recursively in the complete drive tree (under construction)
 
-- > POST /api/files/{path} multipart(file)
+- > POST /api/files/file?path= multipart(file) 
 
 upload the multipart `file` to root (if no `path` specified), or to a directory `path`. Missing directories will be created automatically
 
