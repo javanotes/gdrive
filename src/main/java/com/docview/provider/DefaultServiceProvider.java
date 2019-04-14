@@ -30,4 +30,9 @@ class DefaultServiceProvider implements ServiceProvider {
 		connector.setTokenRedirectUri(string);
 	}
 
+	@Override
+	public String getOAuthToken() {
+		return connector.getAuthToken();
+	}
+
 }

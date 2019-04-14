@@ -7,6 +7,7 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.web.ServerProperties;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -36,8 +37,11 @@ public class Mvc {
     public String redirectToMainPage() {
         return "redirect:" + connector.getOAuthUrl(AUTH_REDIRECT_URL.replaceFirst("@port@", env.getPort()+""));
     }
+	@Autowired
+	ServiceProvider provider;
 	@RequestMapping(value = "/welcome")
-    public String welcome() {
+    public String welcome(HttpServletResponse resp) {
+		resp.setHeader(HttpHeaders.AUTHORIZATION, "Bearer "+provider.getOAuthToken());
 		return "forward:/api/files";
     }
 	@GetMapping(AUTH_REDIRECT)

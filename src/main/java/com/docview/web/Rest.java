@@ -148,8 +148,8 @@ public class Rest {
 			throw new ResourceNotFound(e.getMessage(), e);
 		}
 	}
-	@PostMapping("/files/file/{path}")
-	public void putFile(@PathVariable(name = "path", required = false) String path, @RequestParam("file") MultipartFile file) {
+	@PostMapping("/files/file")
+	public void putFile(@RequestParam(name = "path", required = false) String path, @RequestParam("file") MultipartFile file) {
 		FileNode node = StringUtils.hasText(path) ? new FileNode(path, resolve(file)) : new FileNode(resolve(file));
 		String id = docView.put(node);
 		log.info("File uploaded: "+id);

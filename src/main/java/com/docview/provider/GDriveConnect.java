@@ -18,7 +18,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.ResourceUtils;
 import org.springframework.util.StringUtils;
 
-import com.docview.utils.FileIOException;
 import com.docview.utils.SPIException;
 import com.docview.web.Mvc;
 import com.google.api.client.auth.oauth2.AuthorizationCodeTokenRequest;
@@ -121,11 +120,15 @@ class GDriveConnect implements FactoryBean<Drive>{
      * @return
      */
     public String getAuthToken() {
-    	try {
+    	if(token != null) {
+    		return token.getAccessToken();
+    	}
+    	return "";
+    	/*try {
 			return receiver.waitForCode();
 		} catch (IOException e) {
 			throw new FileIOException("Auth failure", e);
-		}
+		}*/
     }
     
     @SuppressWarnings("unused")

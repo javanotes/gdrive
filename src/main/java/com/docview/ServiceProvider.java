@@ -22,6 +22,11 @@ public interface ServiceProvider {
 	 */
 	void setOAuthToken(String code);
 	/**
+	 * Get the OAuth token generated
+	 * @return
+	 */
+	String getOAuthToken();
+	/**
 	 * The default page will redirect to the Google auth url as constructed with various parameters.
 	 * @param redirectUrl
 	 * @return
