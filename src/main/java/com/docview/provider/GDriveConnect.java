@@ -53,7 +53,7 @@ class GDriveConnect implements FactoryBean<Drive>{
      */
     private static final List<String> SCOPES = Arrays.asList(DriveScopes.DRIVE_METADATA_READONLY, DriveScopes.DRIVE);
     @Value("${default.credentials.path:classpath:credentials.json}")
-    private String CREDENTIALS_FILE_PATH;
+    private String credentialsFile;
 
     /**
      * Creates an authorized Credential object.
@@ -203,7 +203,7 @@ class GDriveConnect implements FactoryBean<Drive>{
     @PostConstruct
     private void onStart() throws Exception {
     	// Load client secrets.
-        java.io.File in = ResourceUtils.getFile(CREDENTIALS_FILE_PATH);
+        java.io.File in = ResourceUtils.getFile(credentialsFile);
         clientSecrets = GoogleClientSecrets.load(JSON_FACTORY, new InputStreamReader(new FileInputStream(in)));
         buildAuthFlow();
     }
